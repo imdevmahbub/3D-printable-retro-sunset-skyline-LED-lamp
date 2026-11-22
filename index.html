@@ -1,0 +1,1364 @@
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOLARIS DECO-84 — 3D-Printable Layered Synthwave LED Lamp</title>
+<style>
+  :root {
+    --bg-dark: #090812;
+    --panel-bg: rgba(14, 13, 26, 0.78);
+    --panel-border: rgba(255, 77, 166, 0.28);
+    --accent-pink: #ff3e9d;
+    --accent-teal: #00e5d4;
+    --accent-amber: #ffaa33;
+    --accent-violet: #9d4edd;
+    --text-main: #f2f0fa;
+    --text-muted: #9c97b8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-main);
+    overflow: hidden;
+    user-select: none;
+  }
+  #canvas-container {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1;
+  }
+  #labels-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+    overflow: hidden;
+  }
+  .callout-badge {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    background: rgba(10, 9, 20, 0.88);
+    border: 1px solid var(--accent-teal);
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    line-height: 1.25;
+    white-space: nowrap;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 10px rgba(0, 229, 212, 0.25);
+    backdrop-filter: blur(6px);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  .callout-badge.visible { opacity: 1; }
+  .callout-badge strong { color: var(--accent-teal); font-weight: 700; margin-right: 4px; }
+  .callout-badge.dim { border-color: var(--accent-amber); }
+  .callout-badge.dim strong { color: var(--accent-amber); }
+
+  /* Header */
+  .hud-header {
+    position: fixed;
+    top: 18px;
+    left: 20px;
+    z-index: 10;
+    pointer-events: none;
+    max-width: 440px;
+  }
+  .brand-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(14, 13, 26, 0.72);
+    border: 1px solid rgba(255, 62, 157, 0.4);
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent-pink);
+    backdrop-filter: blur(10px);
+    margin-bottom: 8px;
+  }
+  .brand-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent-pink);
+    box-shadow: 0 0 8px var(--accent-pink);
+  }
+  .hud-header h1 {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    background: linear-gradient(90deg, #fff 0%, #ffb3d9 50%, #00e5d4 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 2px 20px rgba(255, 62, 157, 0.2);
+  }
+  .hud-header p {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
+
+  /* Bottom View Dock */
+  .view-dock {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    gap: 8px;
+    padding: 6px;
+    background: var(--panel-bg);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    backdrop-filter: blur(14px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  }
+  .view-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    padding: 9px 15px;
+    border-radius: 9px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+  }
+  .view-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.06); }
+  .view-btn.active {
+    color: #fff;
+    background: linear-gradient(135deg, rgba(255, 62, 157, 0.28), rgba(0, 229, 212, 0.22));
+    border-color: rgba(255, 62, 157, 0.6);
+    box-shadow: 0 0 16px rgba(255, 62, 157, 0.25);
+  }
+
+  /* Right Studio Panel */
+  .studio-panel {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    bottom: 80px;
+    width: 340px;
+    z-index: 10;
+    background: var(--panel-bg);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .studio-panel.collapsed {
+    transform: translateX(365px);
+  }
+  .panel-toggle-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 11;
+    background: var(--panel-bg);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    backdrop-filter: blur(12px);
+    display: none;
+  }
+  .studio-panel.collapsed + .panel-toggle-btn { display: block; }
+
+  .panel-tabs {
+    display: flex;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.25);
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 11px 6px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .tab-btn:hover { color: #fff; }
+  .tab-btn.active {
+    color: var(--accent-teal);
+    border-bottom-color: var(--accent-teal);
+    background: rgba(0, 229, 212, 0.06);
+  }
+  .panel-close {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding: 0 12px;
+    cursor: pointer;
+    font-size: 16px;
+  }
+  .panel-close:hover { color: #fff; }
+
+  .tab-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
+    display: none;
+  }
+  .tab-content.active { display: block; }
+  .tab-content::-webkit-scrollbar { width: 5px; }
+  .tab-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 4px; }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent-pink);
+    margin: 12px 0 8px;
+  }
+  .section-title:first-child { margin-top: 0; }
+
+  .control-row {
+    margin-bottom: 12px;
+  }
+  .control-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-main);
+    margin-bottom: 5px;
+  }
+  .control-label span.val { color: var(--accent-teal); font-family: monospace; }
+
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent-pink);
+    cursor: pointer;
+  }
+
+  .preset-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+    margin-bottom: 12px;
+  }
+  .preset-btn {
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    transition: all 0.2s;
+  }
+  .preset-btn:hover { border-color: var(--accent-pink); background: rgba(255, 62, 157, 0.12); }
+  .preset-btn.active { border-color: var(--accent-teal); background: rgba(0, 229, 212, 0.14); }
+  .swatch { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+    margin-bottom: 7px;
+    font-size: 12px;
+  }
+  .toggle-row input { accent-color: var(--accent-teal); cursor: pointer; width: 15px; height: 15px; }
+
+  /* Part Cards */
+  .part-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 8px;
+    transition: border-color 0.2s;
+  }
+  .part-card:hover, .part-card.selected {
+    border-color: var(--accent-teal);
+    background: rgba(0, 229, 212, 0.06);
+  }
+  .part-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .part-title { font-size: 12px; font-weight: 700; color: #fff; }
+  .part-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--accent-amber);
+    font-family: monospace;
+  }
+  .part-meta { font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-bottom: 7px; }
+  .part-actions { display: flex; gap: 6px; }
+  .mini-btn {
+    flex: 1;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mini-btn:hover { background: rgba(0, 229, 212, 0.2); border-color: var(--accent-teal); }
+  .mini-btn.stl { border-color: rgba(255, 62, 157, 0.45); color: #ffb3d9; }
+  .mini-btn.stl:hover { background: rgba(255, 62, 157, 0.25); color: #fff; }
+
+  /* Engineering Specs */
+  .spec-box {
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #d6d3e6;
+    margin-bottom: 10px;
+  }
+  .spec-box ul { padding-left: 16px; margin-top: 4px; }
+  .spec-box li { margin-bottom: 3px; }
+  .disclaimer-box {
+    background: rgba(255, 170, 51, 0.1);
+    border: 1px solid rgba(255, 170, 51, 0.4);
+    border-radius: 8px;
+    padding: 9px;
+    font-size: 11px;
+    line-height: 1.45;
+    color: #ffd599;
+  }
+
+  @media (max-width: 768px) {
+    .studio-panel { width: calc(100vw - 24px); right: 12px; top: auto; bottom: 74px; height: 48vh; }
+    .studio-panel.collapsed { transform: translateY(120%); }
+    .view-dock { width: calc(100vw - 24px); overflow-x: auto; justify-content: flex-start; bottom: 12px; }
+    .hud-header h1 { font-size: 17px; }
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+<div id="labels-layer"></div>
+
+<div class="hud-header">
+  <div class="brand-pill"><span class="brand-dot"></span> 3D-Printable CAD Concept • 220mm Bed</div>
+  <h1>SOLARIS DECO-84</h1>
+  <p>300 W × 210 H × 75 D mm • 4-Layer Parallax Art-Deco Coastal Lamp</p>
+</div>
+
+<div class="view-dock">
+  <button class="view-btn active" data-view="night">Hero Night (Lit)</button>
+  <button class="view-btn" data-view="day">Daylight (Unlit)</button>
+  <button class="view-btn" data-view="exploded">Exploded Technical</button>
+  <button class="view-btn" data-view="bed">220mm Print Bed</button>
+</div>
+
+<div class="studio-panel" id="studio-panel">
+  <div class="panel-tabs">
+    <button class="tab-btn active" data-tab="lighting">Light</button>
+    <button class="tab-btn" data-tab="assembly">Explode</button>
+    <button class="tab-btn" data-tab="parts">Parts & STL</button>
+    <button class="tab-btn" data-tab="specs">Specs</button>
+    <button class="panel-close" id="close-panel" title="Collapse Panel">✕</button>
+  </div>
+
+  <!-- Tab 1: Lighting -->
+  <div class="tab-content active" id="tab-lighting">
+    <div class="section-title">5V WS2812B LED Palette</div>
+    <div class="preset-grid">
+      <button class="preset-btn active" data-preset="synthwave">
+        <span class="swatch" style="background: linear-gradient(135deg,#ff3e9d,#00e5d4);"></span>Synthwave
+      </button>
+      <button class="preset-btn" data-preset="amber">
+        <span class="swatch" style="background: linear-gradient(135deg,#ff5500,#ffbb33);"></span>Amber Sunset
+      </button>
+      <button class="preset-btn" data-preset="miami">
+        <span class="swatch" style="background: linear-gradient(135deg,#00e5d4,#9d4edd);"></span>Teal & Violet
+      </button>
+      <button class="preset-btn" data-preset="crimson">
+        <span class="swatch" style="background: linear-gradient(135deg,#ff1e56,#7b2cbf);"></span>Neon Dusk
+      </button>
+    </div>
+
+    <div class="control-row">
+      <div class="control-label"><span>LED Brightness (5V PWM)</span><span class="val" id="val-brightness">100%</span></div>
+      <input type="range" id="slider-brightness" min="0" max="150" value="100">
+    </div>
+
+    <div class="toggle-row">
+      <span>Animated Sunset Pulse</span>
+      <input type="checkbox" id="toggle-pulse" checked>
+    </div>
+    <div class="toggle-row">
+      <span>Show Internal LED Strip & Path</span>
+      <input type="checkbox" id="toggle-led-path">
+    </div>
+
+    <div class="section-title">Light-Path Architecture</div>
+    <div class="spec-box">
+      A 50 cm 5V WS2812B strip (10 mm wide) sits in a perimeter channel inside the opaque rear enclosure at <strong>12 mm diffuser clearance</strong> behind Layer 4 (Frosted PETG). Light scatters evenly through the sky diffuser, backlights the warm-amber sun slats, and grazes the stepped edges of Layers 3, 2, and 1 for crisp 1980s parallax depth without visible LED hotspots.
+    </div>
+  </div>
+
+  <!-- Tab 2: Assembly & Explode -->
+  <div class="tab-content" id="tab-assembly">
+    <div class="section-title">Exploded Geometry Controls</div>
+    <div class="control-row">
+      <div class="control-label"><span>Z-Axis Layer Separation</span><span class="val" id="val-explode">0%</span></div>
+      <input type="range" id="slider-explode" min="0" max="100" value="0">
+    </div>
+    <div class="control-row">
+      <div class="control-label"><span>X-Axis 220mm Bed-Split Reveal</span><span class="val" id="val-split">0%</span></div>
+      <input type="range" id="slider-split" min="0" max="100" value="0">
+    </div>
+
+    <div class="toggle-row">
+      <span>Technical Dimension Callouts</span>
+      <input type="checkbox" id="toggle-labels">
+    </div>
+
+    <div class="section-title">Layer Visibility</div>
+    <div class="toggle-row"><span>L1: Matte-Black Palms & Waves</span><input type="checkbox" class="layer-vis" data-layer="L1" checked></div>
+    <div class="toggle-row"><span>L2: Deep-Purple Deco Towers</span><input type="checkbox" class="layer-vis" data-layer="L2" checked></div>
+    <div class="toggle-row"><span>L3: Teal Horizon & Spire</span><input type="checkbox" class="layer-vis" data-layer="L3" checked></div>
+    <div class="toggle-row"><span>L4: Frosted Sky & Amber Sun</span><input type="checkbox" class="layer-vis" data-layer="L4" checked></div>
+    <div class="toggle-row"><span>Rear Enclosure & Access Cover</span><input type="checkbox" class="layer-vis" data-layer="REAR" checked></div>
+    <div class="toggle-row"><span>Tip-Resistant Slotted Base</span><input type="checkbox" class="layer-vis" data-layer="BASE" checked></div>
+  </div>
+
+  <!-- Tab 3: Parts & STL Export -->
+  <div class="tab-content" id="tab-parts">
+    <div class="section-title">Bed-Split Printable Components (≤220×220mm)</div>
+    <div id="parts-list"></div>
+  </div>
+
+  <!-- Tab 4: Engineering Specs -->
+  <div class="tab-content" id="tab-specs">
+    <div class="section-title">Print Engineering Rules</div>
+    <div class="spec-box">
+      <ul>
+        <li><strong>Max Bed Size:</strong> Every split part ≤ 158 × 196 mm (fits 220 × 220 × 250 mm bed).</li>
+        <li><strong>Profile:</strong> PLA/PETG, 0.4 mm nozzle, 0.2 mm layers, ≥1.2 mm walls (3 perimeters).</li>
+        <li><strong>Joints:</strong> Concealed keyed dovetails & tongue-and-groove with <strong>0.25 mm clearance</strong> (glue-free).</li>
+        <li><strong>Support-Free:</strong> All plates print flat; overhangs ≤45°, bridges ≤14 mm.</li>
+      </ul>
+    </div>
+
+    <div class="section-title">5V USB LED & Power Budget</div>
+    <div class="spec-box">
+      <ul>
+        <li><strong>Strip:</strong> 50 cm 5V WS2812B (60 LEDs/m = 30 LEDs), 10 mm PCB width, 12 mm diffuser clearance.</li>
+        <li><strong>Power:</strong> 5V USB-A/C, max ~1.2A–1.5A @ full white; typical synthwave gradient ~0.6A (3W). Use 5V/2A USB PSU.</li>
+        <li><strong>Heat & Safety:</strong> Low-voltage 5V only (no mains wiring). Rear enclosure includes upper convection vents & strain-relief cable post.</li>
+      </ul>
+    </div>
+
+    <div class="section-title">Assembly Sequence (Glue-Free)</div>
+    <div class="spec-box">
+      1. Join Base L/R (`01A+01B`) via keyed dovetail.<br>
+      2. Join Rear Enclosure L/R (`07A+07B`); clip in 5V LED strip & route USB cable through strain relief.<br>
+      3. Slide L4 Frosted Sky (`05A+05B`) & Amber Sun (`06`) into rear slots.<br>
+      4. Join & seat L3 Teal (`04A+04B`), L2 Purple (`03A+03B`), and L1 Black (`02A+02B`) into base channels.<br>
+      5. Snap Rear Access Cover (`08`) into place.
+    </div>
+
+    <div class="disclaimer-box">
+      <strong>Digital Concept Notice:</strong> This interactive CAD visualization and generated STL geometry represent a design-for-manufacture concept. Physical 3D printing, mechanical joint tolerances, and electrical assembly have not been physically tested.
+    </div>
+  </div>
+</div>
+
+<button class="panel-toggle-btn" id="open-panel">⚙ Studio & Specs</button>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { STLExporter } from 'three/addons/exporters/STLExporter.js';
+
+// ============================================================================
+// 1. SCENE, CAMERA, RENDERER & POST-PROCESSING
+// ============================================================================
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x07060f);
+scene.fog = new THREE.FogExp2(0x07060f, 0.00085);
+
+const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 1, 3000);
+camera.position.set(165, 145, 360);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+container.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.target.set(0, 102, 0);
+controls.minDistance = 120;
+controls.maxDistance = 850;
+controls.maxPolarAngle = Math.PI * 0.52;
+
+// Post-processing Bloom for realistic LED glow
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.55, 0.6, 0.72);
+composer.addPass(bloomPass);
+composer.addPass(new OutputPass());
+
+// ============================================================================
+// 2. LIGHTING RIG (NIGHT HERO vs DAYLIGHT STUDIO)
+// ============================================================================
+const ambientLight = new THREE.AmbientLight(0x282240, 0.8);
+scene.add(ambientLight);
+
+const keyLight = new THREE.DirectionalLight(0xd8d0ff, 0.9);
+keyLight.position.set(180, 280, 240);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.near = 50;
+keyLight.shadow.camera.far = 900;
+const d = 240;
+keyLight.shadow.camera.left = -d;
+keyLight.shadow.camera.right = d;
+keyLight.shadow.camera.top = d;
+keyLight.shadow.camera.bottom = -d;
+keyLight.shadow.bias = -0.0005;
+scene.add(keyLight);
+
+const rimLight = new THREE.DirectionalLight(0x00e5d4, 0.55);
+rimLight.position.set(-220, 160, -180);
+scene.add(rimLight);
+
+// Internal 5V WS2812B Cavity Lights
+const ledLightsGroup = new THREE.Group();
+scene.add(ledLightsGroup);
+
+const ledPink = new THREE.PointLight(0xff2e93, 18000, 320, 1.8);
+ledPink.position.set(-75, 130, -16);
+const ledAmber = new THREE.PointLight(0xffaa33, 22000, 320, 1.8);
+ledAmber.position.set(0, 115, -14);
+const ledTeal = new THREE.PointLight(0x00e5d4, 16000, 320, 1.8);
+ledTeal.position.set(75, 95, -16);
+const ledDeskWash = new THREE.PointLight(0xff4da6, 12000, 260, 1.8);
+ledDeskWash.position.set(0, 55, 45);
+ledLightsGroup.add(ledPink, ledAmber, ledTeal, ledDeskWash);
+
+// ============================================================================
+// 3. ENVIRONMENT: DESK SURFACE & 220x220 PRINT BED
+// ============================================================================
+const deskGroup = new THREE.Group();
+const deskGeo = new THREE.PlaneGeometry(1600, 1600);
+const deskMat = new THREE.MeshStandardMaterial({
+  color: 0x11101b,
+  roughness: 0.35,
+  metalness: 0.25
+});
+const deskMesh = new THREE.Mesh(deskGeo, deskMat);
+deskMesh.rotation.x = -Math.PI / 2;
+deskMesh.receiveShadow = true;
+deskGroup.add(deskMesh);
+
+const subtleGrid = new THREE.GridHelper(1200, 48, 0x26213d, 0x161426);
+subtleGrid.position.y = 0.2;
+deskGroup.add(subtleGrid);
+scene.add(deskGroup);
+
+// 220 x 220 mm Print Bed Helper
+const printBedGroup = new THREE.Group();
+const bedPlateGeo = new THREE.BoxGeometry(220, 4, 220);
+const bedPlateMat = new THREE.MeshStandardMaterial({ color: 0x1e222a, roughness: 0.5, metalness: 0.4 });
+const bedPlate = new THREE.Mesh(bedPlateGeo, bedPlateMat);
+bedPlate.position.y = -2;
+bedPlate.receiveShadow = true;
+printBedGroup.add(bedPlate);
+
+const bedGrid = new THREE.GridHelper(220, 22, 0x00e5d4, 0x333c4d);
+bedGrid.position.y = 0.2;
+printBedGroup.add(bedGrid);
+
+// 250mm height volume wireframe
+const volGeo = new THREE.BoxGeometry(220, 250, 220);
+const volEdges = new THREE.EdgesGeometry(volGeo);
+const volLine = new THREE.LineSegments(volEdges, new THREE.LineBasicMaterial({ color: 0x00e5d4, transparent: true, opacity: 0.25 }));
+volLine.position.y = 125;
+printBedGroup.add(volLine);
+printBedGroup.visible = false;
+scene.add(printBedGroup);
+
+// ============================================================================
+// 4. MATERIALS (PLA / PETG FILAMENT ACCURATE)
+// ============================================================================
+const matBlackPLA = new THREE.MeshStandardMaterial({ color: 0x15151a, roughness: 0.62, metalness: 0.08 });
+const matPurplePLA = new THREE.MeshStandardMaterial({ color: 0x3a185c, roughness: 0.48, metalness: 0.12 });
+const matTealPLA = new THREE.MeshStandardMaterial({ color: 0x0d7a78, roughness: 0.45, metalness: 0.12 });
+const matFrostedSky = new THREE.MeshPhysicalMaterial({
+  color: 0xffffff,
+  roughness: 0.42,
+  transmission: 0.45,
+  thickness: 3.0,
+  emissive: new THREE.Color(0xff4da6),
+  emissiveIntensity: 0.85
+});
+const matAmberSun = new THREE.MeshPhysicalMaterial({
+  color: 0xff9922,
+  roughness: 0.35,
+  transmission: 0.35,
+  thickness: 3.0,
+  emissive: new THREE.Color(0xff8811),
+  emissiveIntensity: 1.4
+});
+const matEnclosure = new THREE.MeshStandardMaterial({ color: 0x1a1a22, roughness: 0.7, metalness: 0.1 });
+const matLedStrip = new THREE.MeshStandardMaterial({
+  color: 0xffffff,
+  emissive: new THREE.Color(0xff3e9d),
+  emissiveIntensity: 2.2
+});
+
+// ============================================================================
+// 5. PROCEDURAL CAD-STYLE 3D GEOMETRY (WATERTIGHT EXTRUSIONS)
+// ============================================================================
+const lampRoot = new THREE.Group();
+scene.add(lampRoot);
+
+// Helper to create extruded plate
+function extrudeShape(shape, depth, material) {
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: depth,
+    bevelEnabled: false,
+    curveSegments: 24
+  });
+  const mesh = new THREE.Mesh(geo, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+// Registry of all printable parts for Explode, Highlight, Bed-Check & STL Export
+const partsRegistry = [];
+function registerPart(id, name, layerKey, mesh, dims, filament, orientation, basePos, explodeZ, splitX) {
+  mesh.position.copy(basePos);
+  lampRoot.add(mesh);
+  partsRegistry.push({
+    id, name, layerKey, mesh, dims, filament, orientation,
+    basePos: basePos.clone(),
+    explodeZ, splitX
+  });
+}
+
+// --- PART 01A & 01B: TIP-RESISTANT SLOTTED BASE (300 x 22 x 75 mm, split at X=0) ---
+function buildBaseHalf(isLeft) {
+  const group = new THREE.Group();
+  const w = 150, h = 22, d = 75;
+  // Main plinth block
+  const shape = new THREE.Shape();
+  if (isLeft) {
+    shape.moveTo(-150, 0);
+    shape.lineTo(0, 0);
+    // Dovetail key on X=0
+    shape.lineTo(0, 6);
+    shape.lineTo(5, 8);
+    shape.lineTo(5, 14);
+    shape.lineTo(0, 16);
+    shape.lineTo(0, h);
+    shape.lineTo(-144, h);
+    shape.lineTo(-150, h - 4);
+    shape.closePath();
+  } else {
+    shape.moveTo(0, 0);
+    shape.lineTo(150, 0);
+    shape.lineTo(150, h - 4);
+    shape.lineTo(144, h);
+    shape.lineTo(0, h);
+    shape.lineTo(0, 16);
+    shape.lineTo(5.25, 14.2);
+    shape.lineTo(5.25, 7.8);
+    shape.lineTo(0, 6);
+    shape.closePath();
+  }
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: d, bevelEnabled: false });
+  geo.translate(0, 0, -d / 2);
+  const mesh = new THREE.Mesh(geo, matBlackPLA);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  group.add(mesh);
+
+  // Visual slot rails on top surface to show layer channels
+  const slotZ = [24, 12, 0, -12, -26];
+  slotZ.forEach(z => {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(146, 2, 4.2), matEnclosure);
+    rail.position.set(isLeft ? -75 : 75, h - 0.8, z);
+    group.add(rail);
+  });
+  return group;
+}
+registerPart('01A', 'Base Left (Slotted)', 'BASE', buildBaseHalf(true), '155 × 22 × 75 mm', 'Matte Black PLA', 'Flat bottom-down', new THREE.Vector3(0, 0, 0), 0, -16);
+registerPart('01B', 'Base Right (Slotted)', 'BASE', buildBaseHalf(false), '150 × 22 × 75 mm', 'Matte Black PLA', 'Flat bottom-down', new THREE.Vector3(0, 0, 0), 0, 16);
+
+// --- LAYER 1 (Z = +24 mm): MATTE-BLACK PALMS & GEOMETRIC OCEAN WAVES ---
+function buildLayer1Half(isLeft) {
+  const s = new THREE.Shape();
+  if (isLeft) {
+    s.moveTo(-147, 14);
+    s.lineTo(0, 14);
+    // Dovetail tab
+    s.lineTo(0, 22); s.lineTo(5, 24); s.lineTo(5, 32); s.lineTo(0, 34);
+    // Geometric wave crests toward center
+    s.lineTo(0, 44);
+    s.quadraticCurveTo(-35, 52, -70, 40);
+    s.quadraticCurveTo(-92, 33, -110, 46);
+    // Palm trunk sweeping up-left
+    s.lineTo(-116, 46);
+    s.quadraticCurveTo(-110, 105, -122, 158);
+    // Palm fronds (connected, ≥45° printable)
+    s.lineTo(-142, 148); s.lineTo(-125, 164);
+    s.lineTo(-145, 174); s.lineTo(-122, 170);
+    s.lineTo(-132, 192); s.lineTo(-116, 173);
+    s.lineTo(-96, 188); s.lineTo(-110, 168);
+    s.lineTo(-86, 168); s.lineTo(-108, 160);
+    s.lineTo(-92, 142); s.lineTo(-112, 155);
+    // Outer trunk return
+    s.quadraticCurveTo(-102, 105, -124, 44);
+    s.lineTo(-147, 38);
+    s.closePath();
+  } else {
+    s.moveTo(0, 14);
+    s.lineTo(147, 14);
+    s.lineTo(147, 42);
+    // Right palm trunk
+    s.lineTo(126, 46);
+    s.quadraticCurveTo(112, 102, 124, 152);
+    s.lineTo(144, 142); s.lineTo(126, 158);
+    s.lineTo(146, 168); s.lineTo(124, 165);
+    s.lineTo(135, 188); s.lineTo(118, 168);
+    s.lineTo(98, 182); s.lineTo(112, 162);
+    s.lineTo(88, 158); s.lineTo(110, 152);
+    s.quadraticCurveTo(100, 102, 114, 44);
+    // Wave crest back to X=0
+    s.quadraticCurveTo(75, 54, 40, 42);
+    s.quadraticCurveTo(20, 36, 0, 44);
+    // Dovetail socket
+    s.lineTo(0, 34); s.lineTo(5.25, 32.2); s.lineTo(5.25, 23.8); s.lineTo(0, 22);
+    s.closePath();
+  }
+  return extrudeShape(s, 3.2, matBlackPLA);
+}
+registerPart('02A', 'L1 Foreground Left (Palm/Wave)', 'L1', buildLayer1Half(true), '152 × 178 × 3.2 mm', 'Matte Black PLA', 'Flat on Z-face', new THREE.Vector3(0, 0, 24), 72, -16);
+registerPart('02B', 'L1 Foreground Right (Palm/Wave)', 'L1', buildLayer1Half(false), '147 × 174 × 3.2 mm', 'Matte Black PLA', 'Flat on Z-face', new THREE.Vector3(0, 0, 24), 72, 16);
+
+// --- LAYER 2 (Z = +12 mm): DEEP-PURPLE ART-DECO HOTEL TOWERS ---
+function addRectHole(shape, x, y, w, h) {
+  const hole = new THREE.Path();
+  hole.moveTo(x, y);
+  hole.lineTo(x + w, y);
+  hole.lineTo(x + w, y + h);
+  hole.lineTo(x, y + h);
+  hole.closePath();
+  shape.holes.push(hole);
+}
+
+function buildLayer2Half(isLeft) {
+  const s = new THREE.Shape();
+  if (isLeft) {
+    s.moveTo(-147, 14);
+    s.lineTo(0, 14);
+    s.lineTo(0, 24); s.lineTo(5, 26); s.lineTo(5, 36); s.lineTo(0, 38);
+    // Center gap podium
+    s.lineTo(0, 62);
+    s.lineTo(-22, 62);
+    // Grand Left-Center Stepped Deco Tower
+    s.lineTo(-22, 138);
+    s.lineTo(-32, 138); s.lineTo(-32, 156);
+    s.lineTo(-42, 156); s.lineTo(-42, 174);
+    s.lineTo(-48, 174); s.lineTo(-48, 190); // Spire
+    s.lineTo(-54, 190); s.lineTo(-54, 174);
+    s.lineTo(-60, 174); s.lineTo(-60, 156);
+    s.lineTo(-70, 156); s.lineTo(-70, 138);
+    s.lineTo(-80, 138); s.lineTo(-80, 95);
+    // Far-Left Tiered Tower
+    s.lineTo(-92, 95);
+    s.lineTo(-92, 128);
+    s.lineTo(-104, 128); s.lineTo(-104, 142);
+    s.lineTo(-124, 142); s.lineTo(-124, 128);
+    s.lineTo(-136, 128); s.lineTo(-136, 78);
+    s.lineTo(-147, 78);
+    s.closePath();
+    // Crisp Art-Deco geometric window slits (bridges <= 8 mm)
+    for (let y = 70; y <= 122; y += 16) {
+      addRectHole(s, -36, y, 7, 10);
+      addRectHole(s, -54, y, 7, 10);
+      addRectHole(s, -72, y, 7, 10);
+    }
+    addRectHole(s, -54, 144, 7, 18);
+    for (let y = 76; y <= 112; y += 16) {
+      addRectHole(s, -110, y, 6, 10);
+      addRectHole(s, -124, y, 6, 10);
+    }
+  } else {
+    s.moveTo(0, 14);
+    s.lineTo(147, 14);
+    s.lineTo(147, 72);
+    // Far-Right Coastal Pavilion
+    s.lineTo(132, 72); s.lineTo(132, 118);
+    s.lineTo(118, 118); s.lineTo(118, 130);
+    s.lineTo(100, 130); s.lineTo(100, 118);
+    s.lineTo(86, 118); s.lineTo(86, 84);
+    // Right-Center Ziggurat Tower
+    s.lineTo(74, 84); s.lineTo(74, 146);
+    s.lineTo(62, 146); s.lineTo(62, 166);
+    s.lineTo(44, 166); s.lineTo(44, 146);
+    s.lineTo(32, 146); s.lineTo(32, 62);
+    s.lineTo(0, 62);
+    s.lineTo(0, 38); s.lineTo(5.25, 36.2); s.lineTo(5.25, 25.8); s.lineTo(0, 24);
+    s.closePath();
+    // Window cutouts
+    for (let y = 74; y <= 132; y += 16) {
+      addRectHole(s, 42, y, 7, 10);
+      addRectHole(s, 58, y, 7, 10);
+    }
+    addRectHole(s, 50, 148, 6, 12);
+    for (let y = 74; y <= 104; y += 15) {
+      addRectHole(s, 105, y, 8, 9);
+    }
+  }
+  return extrudeShape(s, 3.2, matPurplePLA);
+}
+registerPart('03A', 'L2 Deco Towers Left', 'L2', buildLayer2Half(true), '152 × 176 × 3.2 mm', 'Deep Purple PLA', 'Flat on Z-face', new THREE.Vector3(0, 0, 12), 38, -16);
+registerPart('03B', 'L2 Deco Towers Right', 'L2', buildLayer2Half(false), '147 × 152 × 3.2 mm', 'Deep Purple PLA', 'Flat on Z-face', new THREE.Vector3(0, 0, 12), 38, 16);
+
+// --- LAYER 3 (Z = 0 mm): TEAL ARCHITECTURAL DETAILS & CENTRAL SPIRE ---
+function buildLayer3Half(isLeft) {
+  const s = new THREE.Shape();
+  if (isLeft) {
+    s.moveTo(-147, 14);
+    s.lineTo(0, 14);
+    s.lineTo(0, 186); // Central Deco Spire Left Half
+    s.lineTo(-10, 170);
+    s.lineTo(-10, 142);
+    s.lineTo(-18, 142);
+    s.lineTo(-18, 86);
+    s.lineTo(-96, 86);
+    s.lineTo(-96, 114);
+    s.lineTo(-114, 114);
+    s.lineTo(-114, 86);
+    s.lineTo(-147, 86);
+    s.closePath();
+    addRectHole(s, -13, 96, 7, 36);
+    addRectHole(s, -68, 56, 22, 18);
+  } else {
+    s.moveTo(0, 14);
+    s.lineTo(147, 14);
+    s.lineTo(147, 86);
+    s.lineTo(114, 86);
+    s.lineTo(114, 116);
+    s.lineTo(94, 116);
+    s.lineTo(94, 86);
+    s.lineTo(18, 86);
+    s.lineTo(18, 142);
+    s.lineTo(10, 142);
+    s.lineTo(10, 170);
+    s.lineTo(0, 186);
+    s.closePath();
+    addRectHole(s, 6, 96, 7, 36);
+    addRectHole(s, 46, 56, 22, 18);
+  }
+  return extrudeShape(s, 3.2, matTealPLA);
+}
+registerPart('04A', 'L3 Teal Horizon Left', 'L3', buildLayer3Half(true), '147 × 172 × 3.2 mm', 'Teal PLA', 'Flat on Z-face', new THREE.Vector3(0, 0, 0), 4, -16);
+registerPart('04B', 'L3 Teal Horizon Right', 'L3', buildLayer3Half(false), '147 × 172 × 3.2 mm', 'Teal PLA', 'Flat on Z-face', new THREE.Vector3(0, 0, 0), 4, 16);
+
+// --- LAYER 4 (Z = -12 mm): FROSTED SKY DIFFUSER + WARM-AMBER SETTING SUN ---
+function buildDiffuserHalf(isLeft) {
+  const s = new THREE.Shape();
+  if (isLeft) {
+    s.moveTo(-147, 14);
+    s.lineTo(0, 14);
+    s.lineTo(0, 204);
+    s.lineTo(-147, 204);
+    s.closePath();
+  } else {
+    s.moveTo(0, 14);
+    s.lineTo(147, 14);
+    s.lineTo(147, 204);
+    s.lineTo(0, 204);
+    s.closePath();
+  }
+  return extrudeShape(s, 2.4, matFrostedSky);
+}
+registerPart('05A', 'L4 Frosted Sky Diffuser Left', 'L4', buildDiffuserHalf(true), '147 × 190 × 2.4 mm', 'Frosted White PETG', 'Flat on Z-face', new THREE.Vector3(0, 0, -12), -32, -16);
+registerPart('05B', 'L4 Frosted Sky Diffuser Right', 'L4', buildDiffuserHalf(false), '147 × 190 × 2.4 mm', 'Frosted White PETG', 'Flat on Z-face', new THREE.Vector3(0, 0, -12), -32, 16);
+
+// Warm-Translucent Setting Sun with 1980s Synthwave Scanlines (Single piece Ø 116 mm)
+function buildSunDisc() {
+  const s = new THREE.Shape();
+  const r = 58, cy = 122;
+  s.absarc(0, cy, r, 0, Math.PI * 2, false);
+  // Horizontal synthwave scanline cutouts inside perimeter ring
+  const bands = [
+    { y: 108, h: 3.5, w: 46 },
+    { y: 97,  h: 4.5, w: 44 },
+    { y: 85,  h: 5.5, w: 38 },
+    { y: 72,  h: 6.5, w: 26 }
+  ];
+  bands.forEach(b => addRectHole(s, -b.w, b.y, b.w * 2, b.h));
+  return extrudeShape(s, 3.0, matAmberSun);
+}
+registerPart('06', 'L4 Amber Synthwave Sun', 'L4', buildSunDisc(), 'Ø 116 × 3.0 mm', 'Translucent Amber PLA', 'Flat on Z-face', new THREE.Vector3(0, 0, -9.2), -20, 0);
+
+// --- REAR LIGHT ENCLOSURE (Z = -26 to -44 mm) & ACCESS COVER ---
+function buildEnclosureHalf(isLeft) {
+  const group = new THREE.Group();
+  const s = new THREE.Shape();
+  if (isLeft) {
+    s.moveTo(-150, 14); s.lineTo(0, 14); s.lineTo(0, 210); s.lineTo(-150, 210); s.closePath();
+    // Hollow internal light chamber leaving 8mm frame
+    addRectHole(s, -142, 22, 142, 180);
+  } else {
+    s.moveTo(0, 14); s.lineTo(150, 14); s.lineTo(150, 210); s.lineTo(0, 210); s.closePath();
+    addRectHole(s, 0, 22, 142, 180);
+  }
+  const walls = extrudeShape(s, 18, matEnclosure);
+  walls.position.z = -44;
+  group.add(walls);
+
+  // Rear backplate with access bay cutout
+  const back = new THREE.Shape();
+  if (isLeft) {
+    back.moveTo(-150, 14); back.lineTo(0, 14); back.lineTo(0, 210); back.lineTo(-150, 210); back.closePath();
+    addRectHole(back, -52, 28, 52, 82);
+  } else {
+    back.moveTo(0, 14); back.lineTo(150, 14); back.lineTo(150, 210); back.lineTo(0, 210); back.closePath();
+    addRectHole(back, 0, 28, 52, 82);
+  }
+  const backMesh = extrudeShape(back, 2.4, matEnclosure);
+  backMesh.position.z = -46.4;
+  group.add(backMesh);
+  return group;
+}
+registerPart('07A', 'Rear Light Enclosure Left', 'REAR', buildEnclosureHalf(true), '150 × 196 × 20.4 mm', 'Matte Black PLA', 'Back-down', new THREE.Vector3(0, 0, 0), -72, -16);
+registerPart('07B', 'Rear Light Enclosure Right', 'REAR', buildEnclosureHalf(false), '150 × 196 × 20.4 mm', 'Matte Black PLA', 'Back-down', new THREE.Vector3(0, 0, 0), -72, 16);
+
+function buildAccessCover() {
+  const s = new THREE.Shape();
+  s.moveTo(-54, 26); s.lineTo(54, 26); s.lineTo(54, 112); s.lineTo(-54, 112); s.closePath();
+  const mesh = extrudeShape(s, 2.4, matEnclosure);
+  mesh.position.z = -48.8;
+  return mesh;
+}
+registerPart('08', 'Removable Rear Access Cover', 'REAR', buildAccessCover(), '108 × 86 × 2.4 mm', 'Matte Black PLA', 'Flat on Z-face', new THREE.Vector3(0, 0, 0), -106, 0);
+
+// --- INTERNAL 5V WS2812B LED STRIP & USB CABLE ROUTING VISUALIZER ---
+const ledPathGroup = new THREE.Group();
+const stripPoints = [
+  new THREE.Vector3(120, 26, -30),
+  new THREE.Vector3(134, 26, -30),
+  new THREE.Vector3(134, 196, -30),
+  new THREE.Vector3(-134, 196, -30),
+  new THREE.Vector3(-134, 26, -30),
+  new THREE.Vector3(-40, 26, -30)
+];
+const stripCurve = new THREE.CatmullRomCurve3(stripPoints, false, 'catmullrom', 0.08);
+const stripGeo = new THREE.TubeGeometry(stripCurve, 64, 2.5, 8, false);
+const stripMesh = new THREE.Mesh(stripGeo, matLedStrip);
+ledPathGroup.add(stripMesh);
+
+// USB Cable exiting rear strain relief
+const cableCurve = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(120, 26, -30),
+  new THREE.Vector3(135, 16, -42),
+  new THREE.Vector3(155, 4, -75),
+  new THREE.Vector3(195, 2, -135)
+]);
+const cableMesh = new THREE.Mesh(new THREE.TubeGeometry(cableCurve, 32, 1.8, 8, false), matBlackPLA);
+ledPathGroup.add(cableMesh);
+ledPathGroup.visible = false;
+lampRoot.add(ledPathGroup);
+
+// ============================================================================
+// 6. CALLOUT LABELS FOR EXPLODED TECHNICAL VIEW
+// ============================================================================
+const labelsLayer = document.getElementById('labels-layer');
+const calloutDefs = [
+  { id: 'c1', text: '<strong>L1</strong>Matte-Black Palms (Z+24)', pos: new THREE.Vector3(-115, 165, 24), partId: '02A' },
+  { id: 'c2', text: '<strong>L2</strong>Purple Deco Towers (Z+12)', pos: new THREE.Vector3(-55, 185, 12), partId: '03A' },
+  { id: 'c3', text: '<strong>L3</strong>Teal Horizon Spire (Z 0)', pos: new THREE.Vector3(25, 175, 0), partId: '04B' },
+  { id: 'c4', text: '<strong>L4</strong>Amber Sun Ø116mm', pos: new THREE.Vector3(62, 130, -9), partId: '06' },
+  { id: 'c5', text: '<strong>L4</strong>Frosted PETG Diffuser', pos: new THREE.Vector3(-110, 195, -12), partId: '05A' },
+  { id: 'c6', text: '<strong>5V LED</strong>12mm Diffuser Clearance', pos: new THREE.Vector3(125, 185, -30), partId: '07B' },
+  { id: 'c7', text: '<strong>DIM</strong>300 W × 210 H × 75 D mm', pos: new THREE.Vector3(0, 224, 0), isDim: true }
+];
+
+const calloutEls = calloutDefs.map(def => {
+  const el = document.createElement('div');
+  el.className = 'callout-badge' + (def.isDim ? ' dim' : '');
+  el.innerHTML = def.text;
+  labelsLayer.appendChild(el);
+  return { ...def, el };
+});
+
+// ============================================================================
+// 7. STATE, PRESETS & INTERACTION LOGIC
+// ============================================================================
+const state = {
+  view: 'night',
+  explode: 0,
+  split: 0,
+  brightness: 1.0,
+  pulse: true,
+  showLabels: false,
+  selectedPart: null,
+  camTargetPos: new THREE.Vector3(165, 145, 360),
+  camTargetLook: new THREE.Vector3(0, 102, 0),
+  lerpCam: false
+};
+
+const presets = {
+  synthwave: { p1: 0xff2e93, p2: 0xffaa33, p3: 0x00e5d4, sky: 0xff4da6, sun: 0xff8811 },
+  amber:     { p1: 0xff4400, p2: 0xffcc44, p3: 0xff6622, sky: 0xff6a1a, sun: 0xffbb22 },
+  miami:     { p1: 0x00e5d4, p2: 0x9d4edd, p3: 0xff3e9d, sky: 0x00d9c8, sun: 0xff55aa },
+  crimson:   { p1: 0xff1e56, p2: 0x7b2cbf, p3: 0xffac41, sky: 0xd91656, sun: 0xff7722 }
+};
+let activePreset = presets.synthwave;
+
+function applyLighting() {
+  const isLit = state.view !== 'day' && state.brightness > 0.02;
+  const mult = isLit ? state.brightness : 0;
+
+  ledPink.color.setHex(activePreset.p1);
+  ledAmber.color.setHex(activePreset.p2);
+  ledTeal.color.setHex(activePreset.p3);
+  ledDeskWash.color.setHex(activePreset.sky);
+
+  ledPink.intensity = 18000 * mult;
+  ledAmber.intensity = 22000 * mult;
+  ledTeal.intensity = 16000 * mult;
+  ledDeskWash.intensity = 12000 * mult;
+
+  matFrostedSky.emissive.setHex(activePreset.sky);
+  matFrostedSky.emissiveIntensity = 0.85 * mult;
+  matAmberSun.emissive.setHex(activePreset.sun);
+  matAmberSun.emissiveIntensity = 1.45 * mult;
+  matLedStrip.emissive.setHex(activePreset.p1);
+  matLedStrip.emissiveIntensity = 2.2 * mult;
+}
+
+function setViewMode(mode) {
+  state.view = mode;
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === mode));
+
+  if (mode === 'night') {
+    scene.background.setHex(0x07060f);
+    scene.fog.color.setHex(0x07060f);
+    deskMat.color.setHex(0x11101b);
+    ambientLight.intensity = 0.8;
+    keyLight.intensity = 0.9;
+    keyLight.color.setHex(0xd8d0ff);
+    bloomPass.strength = 0.55;
+    deskGroup.visible = true;
+    printBedGroup.visible = false;
+    setExplode(0);
+    setSplit(0);
+    setShowLabels(false);
+    moveCamera(165, 145, 360, 0, 102, 0);
+  } else if (mode === 'day') {
+    scene.background.setHex(0xe8ecf2);
+    scene.fog.color.setHex(0xe8ecf2);
+    deskMat.color.setHex(0xd4dae3);
+    ambientLight.intensity = 2.2;
+    keyLight.intensity = 2.4;
+    keyLight.color.setHex(0xffffff);
+    bloomPass.strength = 0.0;
+    deskGroup.visible = true;
+    printBedGroup.visible = false;
+    setExplode(0);
+    setSplit(0);
+    setShowLabels(false);
+    moveCamera(175, 140, 350, 0, 102, 0);
+  } else if (mode === 'exploded') {
+    scene.background.setHex(0x0c0e17);
+    scene.fog.color.setHex(0x0c0e17);
+    deskMat.color.setHex(0x151824);
+    ambientLight.intensity = 1.4;
+    keyLight.intensity = 1.5;
+    bloomPass.strength = 0.32;
+    deskGroup.visible = true;
+    printBedGroup.visible = false;
+    setExplode(85);
+    setSplit(65);
+    setShowLabels(true);
+    document.getElementById('toggle-led-path').checked = true;
+    ledPathGroup.visible = true;
+    moveCamera(280, 195, 340, 0, 105, -20);
+  } else if (mode === 'bed') {
+    scene.background.setHex(0x12151e);
+    scene.fog.color.setHex(0x12151e);
+    ambientLight.intensity = 1.8;
+    keyLight.intensity = 1.8;
+    bloomPass.strength = 0.15;
+    deskGroup.visible = false;
+    printBedGroup.visible = true;
+    setExplode(0);
+    setSplit(0);
+    setShowLabels(false);
+    if (!state.selectedPart) selectPartForBed(partsRegistry[2]); // Default L1 Left
+    moveCamera(0, 260, 240, 0, 10, 0);
+  }
+  applyLighting();
+}
+
+function moveCamera(x, y, z, tx, ty, tz) {
+  state.camTargetPos.set(x, y, z);
+  state.camTargetLook.set(tx, ty, tz);
+  state.lerpCam = true;
+}
+
+function setExplode(val) {
+  state.explode = val / 100;
+  document.getElementById('slider-explode').value = val;
+  document.getElementById('val-explode').textContent = val + '%';
+}
+function setSplit(val) {
+  state.split = val / 100;
+  document.getElementById('slider-split').value = val;
+  document.getElementById('val-split').textContent = val + '%';
+}
+function setShowLabels(v) {
+  state.showLabels = v;
+  document.getElementById('toggle-labels').checked = v;
+}
+
+function selectPartForBed(part) {
+  state.selectedPart = part;
+  document.querySelectorAll('.part-card').forEach(c => c.classList.toggle('selected', c.dataset.id === part.id));
+  if (state.view === 'bed') {
+    partsRegistry.forEach(p => {
+      if (p.id === part.id) {
+        p.mesh.visible = true;
+        // Orient flat on 220x220 print bed
+        p.mesh.rotation.set(-Math.PI / 2, 0, 0);
+        p.mesh.position.set(p.splitX < 0 ? 75 : (p.splitX > 0 ? -75 : 0), 4, 105);
+      } else {
+        p.mesh.visible = false;
+      }
+    });
+  }
+}
+
+// ============================================================================
+// 8. BUILD PARTS LIST & REAL STL EXPORT
+// ============================================================================
+const exporter = new STLExporter();
+const partsListEl = document.getElementById('parts-list');
+
+partsRegistry.forEach(part => {
+  const card = document.createElement('div');
+  card.className = 'part-card';
+  card.dataset.id = part.id;
+  card.innerHTML = `
+    <div class="part-header">
+      <span class="part-title">#${part.id} ${part.name}</span>
+      <span class="part-badge">${part.dims}</span>
+    </div>
+    <div class="part-meta">Filament: ${part.filament} • Print: ${part.orientation}</div>
+    <div class="part-actions">
+      <button class="mini-btn inspect-btn">Inspect on 220mm Bed</button>
+      <button class="mini-btn stl export-btn">⬇ Export .STL</button>
+    </div>
+  `;
+  card.querySelector('.inspect-btn').addEventListener('click', () => {
+    setViewMode('bed');
+    selectPartForBed(part);
+  });
+  card.querySelector('.export-btn').addEventListener('click', () => {
+    // Export watertight binary STL of this part
+    const clone = part.mesh.clone();
+    clone.position.set(0, 0, 0);
+    clone.rotation.set(0, 0, 0);
+    clone.updateMatrixWorld(true);
+    const result = exporter.parse(clone, { binary: true });
+    const blob = new Blob([result], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `SolarisDeco84_Part${part.id}_${part.name.replace(/[^a-z0-9]/gi, '_')}.stl`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+  partsListEl.appendChild(card);
+});
+
+// ============================================================================
+// 9. UI EVENT BINDINGS
+// ============================================================================
+document.querySelectorAll('.view-btn').forEach(btn => {
+  btn.addEventListener('click', () => setViewMode(btn.dataset.view));
+});
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+document.getElementById('close-panel').addEventListener('click', () => {
+  document.getElementById('studio-panel').classList.add('collapsed');
+});
+document.getElementById('open-panel').addEventListener('click', () => {
+  document.getElementById('studio-panel').classList.remove('collapsed');
+});
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activePreset = presets[btn.dataset.preset];
+    applyLighting();
+  });
+});
+
+document.getElementById('slider-brightness').addEventListener('input', e => {
+  state.brightness = e.target.value / 100;
+  document.getElementById('val-brightness').textContent = e.target.value + '%';
+  applyLighting();
+});
+document.getElementById('toggle-pulse').addEventListener('change', e => { state.pulse = e.target.checked; });
+document.getElementById('toggle-led-path').addEventListener('change', e => { ledPathGroup.visible = e.target.checked; });
+
+document.getElementById('slider-explode').addEventListener('input', e => setExplode(e.target.value));
+document.getElementById('slider-split').addEventListener('input', e => setSplit(e.target.value));
+document.getElementById('toggle-labels').addEventListener('change', e => setShowLabels(e.target.checked));
+
+document.querySelectorAll('.layer-vis').forEach(cb => {
+  cb.addEventListener('change', () => {
+    const key = cb.dataset.layer;
+    partsRegistry.forEach(p => {
+      if (p.layerKey === key) p.mesh.visible = cb.checked;
+    });
+  });
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ============================================================================
+// 10. ANIMATION LOOP
+// ============================================================================
+const clock = new THREE.Clock();
+const projVec = new THREE.Vector3();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  // Smooth camera transitions
+  if (state.lerpCam) {
+    camera.position.lerp(state.camTargetPos, 0.08);
+    controls.target.lerp(state.camTargetLook, 0.08);
+    if (camera.position.distanceTo(state.camTargetPos) < 1.0) state.lerpCam = false;
+  }
+  controls.update();
+
+  // Update part positions unless in single-part 220mm bed view
+  if (state.view !== 'bed') {
+    partsRegistry.forEach(p => {
+      p.mesh.rotation.set(0, 0, 0);
+      const targetX = p.basePos.x + p.splitX * state.split;
+      const targetZ = p.basePos.z + p.explodeZ * state.explode;
+      p.mesh.position.x += (targetX - p.mesh.position.x) * 0.14;
+      p.mesh.position.y += (p.basePos.y - p.mesh.position.y) * 0.14;
+      p.mesh.position.z += (targetZ - p.mesh.position.z) * 0.14;
+    });
+  }
+
+  // Subtle synthwave LED breathing animation
+  if (state.view !== 'day' && state.pulse && state.brightness > 0.02) {
+    const wave = 1 + Math.sin(t * 1.8) * 0.12;
+    matAmberSun.emissiveIntensity = 1.45 * state.brightness * wave;
+    matFrostedSky.emissiveIntensity = 0.85 * state.brightness * (1 + Math.cos(t * 1.4) * 0.1);
+  }
+
+  // Update 2D projected technical callout badges
+  calloutEls.forEach(c => {
+    if (!state.showLabels || state.view === 'bed') {
+      c.el.classList.remove('visible');
+      return;
+    }
+    const part = c.partId ? partsRegistry.find(p => p.id === c.partId) : null;
+    projVec.copy(c.pos);
+    if (part) {
+      projVec.x += part.splitX * state.split;
+      projVec.z += part.explodeZ * state.explode;
+    }
+    projVec.project(camera);
+    if (projVec.z > 1) {
+      c.el.classList.remove('visible');
+    } else {
+      const x = (projVec.x * 0.5 + 0.5) * window.innerWidth;
+      const y = (-projVec.y * 0.5 + 0.5) * window.innerHeight;
+      c.el.style.left = x + 'px';
+      c.el.style.top = y + 'px';
+      c.el.classList.add('visible');
+    }
+  });
+
+  composer.render();
+}
+
+// Initialize
+applyLighting();
+animate();
+</script>
+</body>
+</html>
